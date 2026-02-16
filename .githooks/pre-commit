@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-commit hook: run formatter (apply) and stage any changes.
+# This file is intentionally placed in .git/hooks so it can be activated
+# in working copies. If your Git setup doesn't execute it automatically,
+# make sure it's executable: `chmod +x .git/hooks/pre-commit`.
+
+git_dir="$(git rev-parse --git-dir 2>/dev/null || true)"
+repo_root="$(dirname $git_dir)"
+
+# Only format staged files to avoid touching the whole tree.
+staged=$(git diff --cached --name-only --diff-filter=ACM || true)
+if [ -z "$staged" ]; then
+    exit 0
+fi
+
+files_to_format=()
+while IFS= read -r f; do
+    case "$f" in
+        src/*|tests/*|test/*)
+            case "$f" in
+                *.c|*.cpp|*.cc|*.cxx|*.h|*.hpp|*.hh)
+                    files_to_format+=("$f")
+                    ;;
+            esac
+            ;;
+    esac
+done <<< "$staged"
+
+if [ ${#files_to_format[@]} -eq 0 ]; then
+    exit 0
+fi
+
+"$repo_root/scripts/format_code.bash" "${files_to_format[@]}" || exit 1
+
+
+exit 0
