@@ -10,7 +10,6 @@ if(TARGET "UnitTest++::UnitTest++")
     set(UNITTEST_TARGET "UnitTest++::UnitTest++")
 else()
     message(info " Installing & building UnitTest++ from source")
-
     # Not found; fetch and build (with upstream tests/warnings disabled)
     FetchContent_Declare(
         unittest_cpp
@@ -20,11 +19,26 @@ else()
     set(UTPP_INCLUDE_TESTS_IN_BUILD OFF CACHE BOOL "Don't build UnitTest++ internal tests" FORCE)
     set(UTPP_AMPLIFY_WARNINGS OFF CACHE BOOL "Don't amplify warnings in UnitTest++" FORCE)
 
-    # Fetch and make available UnitTest++ (prefer FetchContent_MakeAvailable).
-    # We set upstream CMake variables prior to calling MakeAvailable so the
-    # fetched project picks them up from the cache and avoids building its
-    # internal tests or amplifying warnings.
-    FetchContent_MakeAvailable(unittest_cpp)
+    # Not found; fetch the source, patch its minimum CMake requirement to
+    # 3.5 (so newer CMake still configures it), then add it via
+    # add_subdirectory. We use FetchContent_Populate so we can modify the
+    # fetched CMakeLists before it's processed.
+    if(POLICY CMP0169)
+        cmake_policy(PUSH)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
+    FetchContent_Populate(unittest_cpp)
+    if(POLICY CMP0169)
+        cmake_policy(POP)
+    endif()
+
+    if(EXISTS "${unittest_cpp_SOURCE_DIR}/CMakeLists.txt")
+        file(READ "${unittest_cpp_SOURCE_DIR}/CMakeLists.txt" _utpp_cmake_contents)
+        string(REPLACE "cmake_minimum_required(VERSION 3.0)" "cmake_minimum_required(VERSION 3.5)" _utpp_cmake_contents "${_utpp_cmake_contents}")
+        file(WRITE "${unittest_cpp_SOURCE_DIR}/CMakeLists.txt" "${_utpp_cmake_contents}")
+    endif()
+
+    add_subdirectory(${unittest_cpp_SOURCE_DIR} ${unittest_cpp_BINARY_DIR})
 
     if(TARGET "UnitTest++::UnitTest++")
         set(UNITTEST_TARGET "UnitTest++::UnitTest++")
